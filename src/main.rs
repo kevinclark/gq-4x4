@@ -1,8 +1,5 @@
 use hex_literal::hex;
-use rusb::{
-    request_type, Context, Device, DeviceHandle, Direction, Recipient,
-    RequestType, Result, UsbContext,
-};
+use rusb::{Context, Device, DeviceHandle, Result, UsbContext};
 use std::time::Duration;
 
 // device uid pid are picked directly form `lsusb` result
