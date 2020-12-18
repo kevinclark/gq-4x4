@@ -1,16 +1,75 @@
 use gq4x4;
 use rusb::{Device, DeviceHandle, Result, UsbContext};
+use rustyline::{completion::Completer, Context};
+use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 use std::time::Duration;
 
-fn main() -> Result<()> {
-    let (device, handle) = gq4x4::init()?;
+fn main() -> rustyline::Result<()> {
+    use Command::*;
 
-    print_device_info(&handle)?;
+    let (_, handle) = gq4x4::init().unwrap();
 
-    let endpoints = find_readable_endpoints(&device)?;
-    println!("Endpoints:\n{:#?}", endpoints);
+    let mut rl = rustyline::Editor::<ReadlineHelper>::new();
+    rl.set_helper(Some(ReadlineHelper {}));
 
-    Ok(())
+    loop {
+        match rl.readline(">> ") {
+            Err(e) => return Err(e),
+            Ok(line) => {
+                match NAME_TO_COMMAND.iter().find(|(n, _)| *n == line) {
+                    Some((_, command)) => match command {
+                        Quit => return Ok(()),
+                        PrintDetails => print_device_info(&handle).unwrap(),
+                    },
+                    None => println!("Unknown command: {}", line),
+                }
+            }
+        }
+    }
+}
+
+enum Command {
+    PrintDetails,
+    Quit,
+}
+
+static NAME_TO_COMMAND: &[(&'static str, Command)] = &[
+    (&"details", Command::PrintDetails),
+    (&"quit", Command::Quit),
+];
+
+#[derive(Helper, Hinter, Highlighter, Validator)]
+struct ReadlineHelper;
+
+impl Completer for ReadlineHelper {
+    type Candidate = String;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        _: &Context<'_>,
+    ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
+        if line.contains(' ') || line.len() != pos {
+            return Ok((0, vec![]));
+        }
+
+        let candidates: Vec<String> = NAME_TO_COMMAND
+            .iter()
+            .filter(|(n, _)| n.starts_with(line))
+            .map(|(n, _)| n.to_string())
+            .collect();
+
+        Ok((0, candidates))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //#[test]
+    //fn parse() {
+    //assert_eq!(Command::Initialize, parse("initialize"))
+    //}
 }
 
 fn print_device_info(handle: &DeviceHandle<impl UsbContext>) -> Result<()> {

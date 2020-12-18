@@ -9,7 +9,7 @@ const PID: u16 = 0x8613;
 pub fn init() -> Result<(Device<impl UsbContext>, DeviceHandle<impl UsbContext>)>
 {
     let mut context = Context::new()?;
-    let (_, mut handle) =
+    let (device, mut handle) =
         open_device(&mut context, VID, PID).expect("Failed to open USB device");
 
     handle.reset()?;
@@ -18,9 +18,6 @@ pub fn init() -> Result<(Device<impl UsbContext>, DeviceHandle<impl UsbContext>)
 
     // We reopen because the old handle doesn't reflect reality. libusb bug? Usage issue?
     // Probably just a general misunderstanding about how long handles are valid.
-    let (device, handle) =
-        open_device(&mut context, VID, PID).expect("Failed to open USB device");
-
     Ok((device, handle))
 }
 
