@@ -1,6 +1,7 @@
+use anyhow::{anyhow, Result};
 use gq4x4;
 use pretty_hex::*;
-use rusb::{Device, DeviceHandle, Result, UsbContext};
+use rusb::{Device, DeviceHandle, UsbContext};
 use rustyline::{completion::Completer, Context};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 use std::time::Duration;
@@ -17,24 +18,20 @@ fn main() -> rustyline::Result<()> {
         match rl.readline(">> ") {
             Err(e) => return Err(e),
             Ok(line) => {
-                match NAME_TO_COMMAND.iter().find(|(n, _)| *n == line) {
+                let mut parts = line.split(' ');
+                let name = parts.next().unwrap();
+                match NAME_TO_COMMAND.iter().find(|(n, _)| *n == name) {
                     Some((_, command)) => match command {
                         Quit => return Ok(()),
-                        PrintDetails => print_device_info(&handle).unwrap(),
-                        Read => {
-                            let chunk = gq4x4::read(&mut handle);
-                            let chunk = &chunk.bytes[..chunk.len];
-                            println!("{}", pretty_hex(&chunk))
-                        }
-                        FirmwareVersion => {
-                            let chunk = gq4x4::firmware_version(&mut handle);
-                            let chunk = &chunk.bytes[..chunk.len];
-                            println!("{}", pretty_hex(&chunk))
-                        }
-                        SerialNumber => {
-                            let chunk = gq4x4::serial_number(&mut handle);
-                            let chunk = &chunk.bytes[..chunk.len];
-                            println!("{}", pretty_hex(&chunk))
+                        _ => {
+                            match run_command(
+                                &mut handle,
+                                command,
+                                &parts.collect(),
+                            ) {
+                                Ok(s) => println!("{}", s),
+                                Err(e) => println!("Error: {}", e),
+                            }
                         }
                     },
                     None => println!("Unknown command: {}", line),
@@ -44,7 +41,48 @@ fn main() -> rustyline::Result<()> {
     }
 }
 
+fn run_command<T: UsbContext>(
+    mut handle: &mut DeviceHandle<T>,
+    command: &Command,
+    args: &Vec<&str>,
+) -> Result<String> {
+    use Command::*;
+
+    match *command {
+        PrintDetails => {
+            let details = device_details(&handle)?;
+            Ok(format!("{:#?}", details))
+        }
+        Read => {
+            let chunk = gq4x4::read(&mut handle)?;
+            let chunk = &chunk.bytes[..chunk.len];
+            Ok(format!("{}", pretty_hex(&chunk)))
+        }
+        FirmwareVersion => {
+            let chunk = gq4x4::firmware_version(&mut handle)?;
+            let chunk = &chunk.bytes[..chunk.len];
+            Ok(format!("{}", pretty_hex(&chunk)))
+        }
+        SerialNumber => {
+            let chunk = gq4x4::serial_number(&mut handle)?;
+            let chunk = &chunk.bytes[..chunk.len];
+            Ok(format!("{}", pretty_hex(&chunk)))
+        }
+        Poke => {
+            if let Some(arg) = args.first() {
+                let chunk = gq4x4::poke(&mut handle, arg.parse::<u8>()?)?;
+                let chunk = &chunk.bytes[..chunk.len];
+                Ok(format!("{}", pretty_hex(&chunk)))
+            } else {
+                Err(anyhow!("Poke requires an argument"))
+            }
+        }
+        Quit => panic!("Quit command shouldn't be passed to run_command"),
+    }
+}
+
 enum Command {
+    Poke,
     SerialNumber,
     FirmwareVersion,
     Read,
@@ -58,6 +96,7 @@ static NAME_TO_COMMAND: &[(&'static str, Command)] = &[
     (&"quit", Command::Quit),
     (&"firmware", Command::FirmwareVersion),
     (&"serial", Command::SerialNumber),
+    (&"poke", Command::Poke),
 ];
 
 #[derive(Helper, Hinter, Highlighter, Validator)]
@@ -86,46 +125,35 @@ impl Completer for ReadlineHelper {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    //#[test]
-    //fn parse() {
-    //assert_eq!(Command::Initialize, parse("initialize"))
-    //}
+#[derive(Debug)]
+struct DeviceDetails {
+    manufacturer: Option<String>,
+    product: Option<String>,
+    config: u8,
+    languages: Vec<rusb::Language>,
 }
 
-fn print_device_info(handle: &DeviceHandle<impl UsbContext>) -> Result<()> {
+fn device_details(
+    handle: &DeviceHandle<impl UsbContext>,
+) -> Result<DeviceDetails> {
     let device_desc = handle.device().device_descriptor()?;
     let timeout = Duration::from_secs(1);
     let languages = handle.read_languages(timeout)?;
 
-    println!("Active configuration: {}", handle.active_configuration()?);
-    println!("Available languages: {:#?}", languages);
-
-    if !languages.is_empty() {
-        let language = languages[0];
-        println!("Language: {:?}", language);
-
-        println!(
-            "Manufacturer: {}",
-            handle
-                .read_manufacturer_string(language, &device_desc, timeout)
-                .unwrap_or("Not Found".to_string())
-        );
-        println!(
-            "Product: {}",
-            handle
-                .read_product_string(language, &device_desc, timeout)
-                .unwrap_or("Not Found".to_string())
-        );
-        println!(
-            "Serial Number: {}",
-            handle
-                .read_serial_number_string(language, &device_desc, timeout)
-                .unwrap_or("Not Found".to_string())
-        );
+    if let Some(language) = languages.first() {
+        Ok(DeviceDetails {
+            manufacturer: handle
+                .read_manufacturer_string(*language, &device_desc, timeout)
+                .ok(),
+            product: handle
+                .read_product_string(*language, &device_desc, timeout)
+                .ok(),
+            config: handle.active_configuration()?,
+            languages,
+        })
+    } else {
+        Err(anyhow!("No language found"))
     }
-    Ok(())
 }
 
 #[derive(Debug)]

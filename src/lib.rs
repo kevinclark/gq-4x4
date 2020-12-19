@@ -55,44 +55,60 @@ pub struct Chunk {
     pub len: usize,
 }
 
-pub fn firmware_version<T: UsbContext>(handle: &mut DeviceHandle<T>) -> Chunk {
-    handle.write_bulk(0x1, &[2, 0], ONE_SECOND).unwrap();
+pub fn poke<T: UsbContext>(
+    handle: &mut DeviceHandle<T>,
+    val: u8,
+) -> Result<Chunk> {
+    handle.write_bulk(0x1, &[val, 0], ONE_SECOND).unwrap();
     let mut buf = [0; 64];
-    let bytes_read = handle.read_bulk(0x81, &mut buf, ONE_SECOND).unwrap();
+    let bytes_read = handle.read_bulk(0x81, &mut buf, ONE_SECOND)?;
 
-    Chunk {
+    Ok(Chunk {
         bytes: buf,
         len: bytes_read,
-    }
+    })
 }
 
-pub fn serial_number<T: UsbContext>(handle: &mut DeviceHandle<T>) -> Chunk {
-    handle.write_bulk(0x1, &[0x18, 0], ONE_SECOND).unwrap();
+pub fn firmware_version<T: UsbContext>(
+    handle: &mut DeviceHandle<T>,
+) -> Result<Chunk> {
+    handle.write_bulk(0x1, &[2, 0], ONE_SECOND).unwrap();
     let mut buf = [0; 64];
-    let bytes_read = handle.read_bulk(0x81, &mut buf, ONE_SECOND).unwrap();
+    let bytes_read = handle.read_bulk(0x81, &mut buf, ONE_SECOND)?;
 
-    Chunk {
+    Ok(Chunk {
         bytes: buf,
         len: bytes_read,
-    }
+    })
+}
+
+pub fn serial_number<T: UsbContext>(
+    handle: &mut DeviceHandle<T>,
+) -> Result<Chunk> {
+    handle.write_bulk(0x1, &[0x18, 0], ONE_SECOND)?;
+    let mut buf = [0; 64];
+    let bytes_read = handle.read_bulk(0x81, &mut buf, ONE_SECOND)?;
+
+    Ok(Chunk {
+        bytes: buf,
+        len: bytes_read,
+    })
 }
 
 // Only tested with a 2532
-pub fn read<T: UsbContext>(handle: &mut DeviceHandle<T>) -> Chunk {
+pub fn read<T: UsbContext>(handle: &mut DeviceHandle<T>) -> Result<Chunk> {
     let mut buf = [0; 64];
 
-    handle.write_bulk(0x1, &[0x15], ONE_SECOND).unwrap();
-    handle.write_bulk(0x1, &[0x16], ONE_SECOND).unwrap();
-    handle.write_bulk(0x1, &[0x08, 0x00], ONE_SECOND).unwrap();
-    handle
-        .write_bulk(0x1, &hex!("040000200000000040"), ONE_SECOND)
-        .unwrap();
-    let bytes_read = handle.read_bulk(0x81, &mut buf, ONE_SECOND).unwrap();
+    handle.write_bulk(0x1, &[0x15], ONE_SECOND)?;
+    handle.write_bulk(0x1, &[0x16], ONE_SECOND)?;
+    handle.write_bulk(0x1, &[0x08, 0x00], ONE_SECOND)?;
+    handle.write_bulk(0x1, &hex!("040000200000000040"), ONE_SECOND)?;
+    let bytes_read = handle.read_bulk(0x81, &mut buf, ONE_SECOND)?;
 
-    Chunk {
+    Ok(Chunk {
         bytes: buf,
         len: bytes_read,
-    }
+    })
 }
 
 // This is all from recordings and a blackbox
