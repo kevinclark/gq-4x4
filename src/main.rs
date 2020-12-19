@@ -1,4 +1,5 @@
 use gq4x4;
+use pretty_hex::*;
 use rusb::{Device, DeviceHandle, Result, UsbContext};
 use rustyline::{completion::Completer, Context};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
@@ -7,7 +8,7 @@ use std::time::Duration;
 fn main() -> rustyline::Result<()> {
     use Command::*;
 
-    let (_, handle) = gq4x4::init().unwrap();
+    let (_, mut handle) = gq4x4::init().unwrap();
 
     let mut rl = rustyline::Editor::<ReadlineHelper>::new();
     rl.set_helper(Some(ReadlineHelper {}));
@@ -20,6 +21,21 @@ fn main() -> rustyline::Result<()> {
                     Some((_, command)) => match command {
                         Quit => return Ok(()),
                         PrintDetails => print_device_info(&handle).unwrap(),
+                        Read => {
+                            let chunk = gq4x4::read(&mut handle);
+                            let chunk = &chunk.bytes[..chunk.len];
+                            println!("{}", pretty_hex(&chunk))
+                        }
+                        FirmwareVersion => {
+                            let chunk = gq4x4::firmware_version(&mut handle);
+                            let chunk = &chunk.bytes[..chunk.len];
+                            println!("{}", pretty_hex(&chunk))
+                        }
+                        SerialNumber => {
+                            let chunk = gq4x4::serial_number(&mut handle);
+                            let chunk = &chunk.bytes[..chunk.len];
+                            println!("{}", pretty_hex(&chunk))
+                        }
                     },
                     None => println!("Unknown command: {}", line),
                 }
@@ -29,13 +45,19 @@ fn main() -> rustyline::Result<()> {
 }
 
 enum Command {
+    SerialNumber,
+    FirmwareVersion,
+    Read,
     PrintDetails,
     Quit,
 }
 
 static NAME_TO_COMMAND: &[(&'static str, Command)] = &[
     (&"details", Command::PrintDetails),
+    (&"read", Command::Read),
     (&"quit", Command::Quit),
+    (&"firmware", Command::FirmwareVersion),
+    (&"serial", Command::SerialNumber),
 ];
 
 #[derive(Helper, Hinter, Highlighter, Validator)]

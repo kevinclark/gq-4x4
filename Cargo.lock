@@ -98,6 +98,7 @@ name = "gq4x4"
 version = "0.1.0"
 dependencies = [
  "hex-literal",
+ "pretty-hex",
  "rusb",
  "rustyline",
  "rustyline-derive",
@@ -179,6 +180,12 @@ name = "pkg-config"
 version = "0.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3831453b3449ceb48b6d9c7ad7c96d5ea673e9b470a1dc578c2ce6521230884c"
+
+[[package]]
+name = "pretty-hex"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc5c99d529f0d30937f6f4b8a86d988047327bb88d04d2c4afc356de74722131"
 
 [[package]]
 name = "proc-macro2"
