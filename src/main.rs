@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use gq4x4;
 use pretty_hex::*;
-use rusb::{Device, DeviceHandle, UsbContext};
+use rusb::{DeviceHandle, UsbContext};
 use rustyline::{completion::Completer, Context};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 use std::time::Duration;
@@ -157,40 +157,4 @@ fn device_details(
     } else {
         Err(anyhow!("No language found"))
     }
-}
-
-#[derive(Debug)]
-struct Endpoint {
-    config: u8,
-    iface: u8,
-    setting: u8,
-    address: u8,
-}
-
-fn find_readable_endpoints<T: UsbContext>(
-    device: &Device<T>,
-) -> Result<Vec<Endpoint>> {
-    let device_desc = device.device_descriptor()?;
-    let mut endpoints = vec![];
-    for n in 0..device_desc.num_configurations() {
-        let config = match device.config_descriptor(n) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-
-        for interface in config.interfaces() {
-            for interface_desc in interface.descriptors() {
-                for endpoint_desc in interface_desc.endpoint_descriptors() {
-                    endpoints.push(Endpoint {
-                        config: config.number(),
-                        iface: interface_desc.interface_number(),
-                        setting: interface_desc.setting_number(),
-                        address: endpoint_desc.address(),
-                    });
-                }
-            }
-        }
-    }
-
-    Ok(endpoints)
 }
