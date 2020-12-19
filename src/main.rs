@@ -18,23 +18,26 @@ fn main() -> rustyline::Result<()> {
         match rl.readline(">> ") {
             Err(e) => return Err(e),
             Ok(line) => {
+                rl.add_history_entry(&line);
+
                 let mut parts = line.split(' ');
-                let name = parts.next().unwrap();
-                match NAME_TO_COMMAND.iter().find(|(n, _)| *n == name) {
-                    Some((_, command)) => match command {
-                        Quit => return Ok(()),
-                        _ => {
-                            match run_command(
-                                &mut handle,
-                                command,
-                                &parts.collect(),
-                            ) {
-                                Ok(s) => println!("{}", s),
-                                Err(e) => println!("Error: {}", e),
+                if let Some(name) = parts.next() {
+                    match NAME_TO_COMMAND.iter().find(|(n, _)| *n == name) {
+                        Some((_, command)) => match command {
+                            Quit => return Ok(()),
+                            _ => {
+                                match run_command(
+                                    &mut handle,
+                                    command,
+                                    &parts.collect(),
+                                ) {
+                                    Ok(s) => println!("{}", s),
+                                    Err(e) => println!("Error: {}", e),
+                                }
                             }
-                        }
-                    },
-                    None => println!("Unknown command: {}", line),
+                        },
+                        None => println!("Unknown command: {}", line),
+                    }
                 }
             }
         }
