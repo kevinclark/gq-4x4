@@ -1,5 +1,4 @@
 use hex_literal::hex;
-use pretty_hex::*;
 use rusb::{Context, Device, DeviceHandle, Result, UsbContext};
 use std::time::Duration;
 
@@ -57,9 +56,9 @@ pub struct Chunk {
 
 pub fn poke<T: UsbContext>(
     handle: &mut DeviceHandle<T>,
-    val: u8,
+    bytes: &[u8],
 ) -> Result<Chunk> {
-    handle.write_bulk(0x1, &[val, 0], ONE_SECOND).unwrap();
+    handle.write_bulk(0x1, bytes, ONE_SECOND).unwrap();
     let mut buf = [0; 64];
     let bytes_read = handle.read_bulk(0x81, &mut buf, ONE_SECOND)?;
 

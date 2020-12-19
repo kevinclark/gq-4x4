@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use gq4x4;
+use hex;
 use pretty_hex::*;
 use rusb::{DeviceHandle, UsbContext};
 use rustyline::{completion::Completer, Context};
@@ -72,13 +73,9 @@ fn run_command<T: UsbContext>(
             Ok(format!("{}", pretty_hex(&chunk)))
         }
         Poke => {
-            if let Some(arg) = args.first() {
-                let chunk = gq4x4::poke(&mut handle, arg.parse::<u8>()?)?;
-                let chunk = &chunk.bytes[..chunk.len];
-                Ok(format!("{}", pretty_hex(&chunk)))
-            } else {
-                Err(anyhow!("Poke requires an argument"))
-            }
+            let chunk = gq4x4::poke(&mut handle, &hex::decode(args.join(""))?)?;
+            let chunk = &chunk.bytes[..chunk.len];
+            Ok(format!("{}", pretty_hex(&chunk)))
         }
         Quit => panic!("Quit command shouldn't be passed to run_command"),
     }
