@@ -72,12 +72,18 @@ fn run_command<T: UsbContext>(
             gq4x4::poke(&mut handle, &hex::decode(args.join(""))?)?;
             Ok("Ok".to_string())
         }
+        Peek => {
+            let chunk = gq4x4::peek(&mut handle)?;
+            let chunk = &chunk.bytes[..chunk.len];
+            Ok(format!("{}", pretty_hex(&chunk)))
+        }
         Quit => panic!("Quit command shouldn't be passed to run_command"),
     }
 }
 
 enum Command {
     Poke,
+    Peek,
     SerialNumber,
     FirmwareVersion,
     Read,
@@ -92,6 +98,7 @@ static NAME_TO_COMMAND: &[(&'static str, Command)] = &[
     (&"firmware", Command::FirmwareVersion),
     (&"serial", Command::SerialNumber),
     (&"poke", Command::Poke),
+    (&"peek", Command::Peek),
 ];
 
 #[derive(Helper, Hinter, Highlighter, Validator)]

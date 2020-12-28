@@ -1,6 +1,6 @@
 use anyhow::Result;
 use hex_literal::hex;
-use rusb::{Context, DeviceHandle, UsbContext};
+use rusb::{DeviceHandle, UsbContext};
 use std::time::Duration;
 
 // device uid pid are picked directly form `lsusb` result
@@ -9,9 +9,7 @@ const PID: u16 = 0x8613;
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(1);
 
 pub fn init() -> Result<DeviceHandle<impl UsbContext>> {
-    let context = Context::new().unwrap();
     let mut handle = rusb::open_device_with_vid_pid(VID, PID).unwrap();
-
     initialize_device(&mut handle);
 
     // We reopen because the old handle doesn't reflect reality. libusb bug? Usage issue?
@@ -57,20 +55,20 @@ pub fn serial_number<T: UsbContext>(
 
 // Only tested with a 2532
 pub fn read<T: UsbContext>(handle: &mut DeviceHandle<T>) -> Result<Chunk> {
-    let mut buf = [0; 64];
-
     // 15 turns off VCC
-    handle.write_bulk(0x1, &[0x15], DEFAULT_TIMEOUT)?;
+    poke(handle, &[0x15])?;
     // 16 turns on VCC
-    handle.write_bulk(0x1, &[0x16], DEFAULT_TIMEOUT)?;
-    handle.write_bulk(0x1, &[0x08, 0x00], DEFAULT_TIMEOUT)?;
-    handle.write_bulk(0x1, &hex!("040000200000000040"), DEFAULT_TIMEOUT)?;
-    let bytes_read = handle.read_bulk(0x81, &mut buf, DEFAULT_TIMEOUT)?;
+    poke(handle, &[0x16])?;
+    poke(handle, &[0x08, 0x00])?;
+    poke(handle, &hex!("040000200000000040"))?;
 
-    Ok(Chunk {
-        bytes: buf,
-        len: bytes_read,
-    })
+    // Reading sends back a payload (64 bytes) and then 00 to say "done" afaict.
+    let result = peek(handle);
+
+    peek(handle)?; // Flush the extra 00
+    poke(handle, &[0x15])?; // Turn off VCC
+
+    result
 }
 
 fn mimic_bulk_transaction<T: UsbContext>(
@@ -195,10 +193,10 @@ fn initialize_device<T: UsbContext>(mut handle: &mut DeviceHandle<T>) {
     // Frame 172
     ]);
 
-    //// Bulk reads/writes after control transfers
-    //// These are dumps from bytes 30 on.
-    //// First byte is endpoint address and the first bit indicates read (1) or write (0).
-    //// 10 bytes in is the data.
+    // Bulk reads/writes after control transfers
+    // These are dumps from bytes 30 on.
+    // First byte is endpoint address and the first bit indicates read (1) or write (0).
+    // 10 bytes in is the data.
 
     //for data in [
     //// Frame 213
