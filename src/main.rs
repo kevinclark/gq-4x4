@@ -7,40 +7,36 @@ use rustyline::{completion::Completer, Context};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 use std::time::Duration;
 
-fn main() -> rustyline::Result<()> {
-    use Command::*;
-
-    let (_, mut handle) = gq4x4::init().unwrap();
+fn main() -> Result<()> {
+    let mut handle = gq4x4::init()?;
 
     let mut rl = rustyline::Editor::<ReadlineHelper>::new();
     rl.set_helper(Some(ReadlineHelper {}));
 
     loop {
-        match rl.readline(">> ") {
-            Err(e) => return Err(e),
-            Ok(line) => {
-                rl.add_history_entry(&line);
+        let line = rl.readline(">> ")?;
+        rl.add_history_entry(&line);
 
-                let mut parts = line.split(' ');
-                if let Some(name) = parts.next() {
-                    match NAME_TO_COMMAND.iter().find(|(n, _)| *n == name) {
-                        Some((_, command)) => match command {
-                            Quit => return Ok(()),
-                            _ => {
-                                match run_command(
-                                    &mut handle,
-                                    command,
-                                    &parts.collect(),
-                                ) {
-                                    Ok(s) => println!("{}", s),
-                                    Err(e) => println!("Error: {}", e),
-                                }
-                            }
-                        },
-                        None => println!("Unknown command: {}", line),
+        let mut parts = line.split(' ');
+        if let Some(name) = parts.next() {
+            match NAME_TO_COMMAND.iter().find(|(n, _)| *n == name) {
+                Some((_, command)) => match command {
+                    Command::Quit => return Ok(()),
+                    _ => {
+                        match run_command(
+                            &mut handle,
+                            command,
+                            &parts.collect(),
+                        ) {
+                            Ok(s) => println!("{}", s),
+                            Err(e) => println!("Error: {}", e),
+                        }
                     }
-                }
+                },
+                None => println!("Unknown command: {}", line),
             }
+        } else {
+            println!("No line");
         }
     }
 }
@@ -73,9 +69,8 @@ fn run_command<T: UsbContext>(
             Ok(format!("{}", pretty_hex(&chunk)))
         }
         Poke => {
-            let chunk = gq4x4::poke(&mut handle, &hex::decode(args.join(""))?)?;
-            let chunk = &chunk.bytes[..chunk.len];
-            Ok(format!("{}", pretty_hex(&chunk)))
+            gq4x4::poke(&mut handle, &hex::decode(args.join(""))?)?;
+            Ok("Ok".to_string())
         }
         Quit => panic!("Quit command shouldn't be passed to run_command"),
     }
